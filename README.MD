@@ -22,8 +22,10 @@ Map<String, Object>  consumerConfig = ImmutableMap.<String, Object>builder()
 
 KafkaProtoParquetWriter<SampleMessage> writer =
         new Builder<>("TestParquetWriter", "topic", consumerConfig, "/tmp/parquetFiles",
-                      SampleMessage.class, SampleMessage.PARSER).threadCount(1)
+                      SampleMessage.class, SampleMessage.PARSER)
+                .threadCount(1)
                 .maxRecordsInFile(1_000_000)
                 .maxFileOpenDuration(15, TimeUnit.MINUTES)
                 .build();
+writer.start();
 ```

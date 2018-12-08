@@ -305,9 +305,10 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
             ExecutorService executor = Executors.newFixedThreadPool(1);
             try {
                 executor.submit(() -> consumer.poll(0)).get(60, TimeUnit.SECONDS);
-                executor.shutdown();
             } catch (ExecutionException | TimeoutException e) {
                 throw new IOException("Connecting to kafka failed.", e);
+            } finally {
+                executor.shutdown();
             }
             logger.debug("Kafka consumer for worker '{}' initialized.", index);
         }
