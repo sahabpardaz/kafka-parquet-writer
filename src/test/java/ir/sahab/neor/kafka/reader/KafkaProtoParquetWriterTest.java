@@ -108,7 +108,7 @@ public class KafkaProtoParquetWriterTest {
                 new Builder<>("TestParquetWriter", TOPIC, consumerConfig, targetPath,
                               SampleMessage.class, SampleMessage.PARSER).threadCount(1)
                         .maxRecordsInFile(maxRecordInFile)
-                        .maxFileOpenDuration(1, TimeUnit.SECONDS)
+                        .maxFileOpenDuration(2, TimeUnit.SECONDS)
                         .hadoopConf(hdfsConfig);
 
         ArrayList<SampleMessage> messages;
@@ -250,7 +250,6 @@ public class KafkaProtoParquetWriterTest {
                     (metadata, exception) -> Assert.assertTrue(exception == null));
                 list.add(message);
             }
-            producer.flush();
         }
         return list;
     }
