@@ -299,6 +299,9 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
                     }
                 }
             });
+
+            // Ensure connection to Kafka topic. Note that check is done in a separate thread as it
+            // may block indefinitely (KIP-266)
             ExecutorService executor = Executors.newFixedThreadPool(1);
             try {
                 executor.submit(() -> consumer.poll(0)).get(60, TimeUnit.SECONDS);
