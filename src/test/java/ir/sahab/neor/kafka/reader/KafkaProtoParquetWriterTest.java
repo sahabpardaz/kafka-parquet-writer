@@ -50,7 +50,6 @@ import org.springframework.kafka.test.rule.KafkaEmbedded;
 public class KafkaProtoParquetWriterTest {
 
     private static final String TOPIC = "proto-source";
-
     private static final String INSTANCE_NAME = "TestParquetWriter";
     private static HdfsConfiguration hdfsConfig = new HdfsConfiguration();
 
@@ -75,7 +74,6 @@ public class KafkaProtoParquetWriterTest {
 
     @BeforeClass
     public static void setUpClass() throws Exception {
-        hdfsConfig.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, "http://hdfscluster/");
         hdfsConfig.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR,
                        miniClusterDataDir.newFolder().getAbsolutePath());
         miniDFSCluster = new MiniDFSCluster.Builder(hdfsConfig).build();
@@ -131,6 +129,7 @@ public class KafkaProtoParquetWriterTest {
         }
         List<SampleMessage> readRecords =
                 ParquetTestUtils.readParquetFiles(hdfsConfig, files, SampleMessage.class);
+        assertEquals(messages.size(), readRecords.size());
         assertThat(messages, containsInAnyOrder(readRecords.toArray(new SampleMessage[0])));
     }
 
@@ -201,6 +200,7 @@ public class KafkaProtoParquetWriterTest {
         // Checking whether they are stored in parquet files correctly
         List<SampleMessage> actual =
                 ParquetTestUtils.readParquetFiles(hdfsConfig, files, SampleMessage.class);
+        assertEquals(messages.size(), actual.size());
         assertThat(actual, containsInAnyOrder(messages.toArray(new SampleMessage[0])));
     }
 
