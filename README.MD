@@ -1,10 +1,10 @@
 # Kafka Proto Parquet Writer
-Kafka proto parquet writer reads logs from a Kafka topic and writes them as parquet files. Parquet files can be created on local file system or HDFS. It can read and write logs in multiple threads. As writing to single parquet file can not be done concurrently, each threads writes to a separate file. 
+Kafka proto parquet writer reads records from a Kafka topic and writes them as parquet files. Parquet files can be created on local file system or HDFS. It can read and write records in multiple threads. As writing to single parquet file can not be done concurrently, each threads writes to a separate file. 
 
 Each thread creates new parquet files when certain criteria have been met in output file. Currently these policies are supported for closing a file and opening a new one:
 
 * File Size: When size of the parquet file reaches a threshold
-* Record Count: When number of logs written to parquet file reaches a threshold
+* Record Count: When number of records written to parquet file reaches a threshold
 * Open Time: When a file has been open for certain amount of time
 
 These policies can be configured together and file is closed when any of configured threshold has been reached.
