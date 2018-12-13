@@ -159,14 +159,10 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
 
         MetricRegistry metricRegistry = builder.metricRegistry;
         if (metricRegistry != null) {
-            metricRegistry.register("parquet.writer.written.records",
-                    totalWrittenRecords);
-            metricRegistry.register("parquet.writer.flushed.records",
-                    totalFlushedRecords);
-            metricRegistry.register("parquet.writer.written.bytes",
-                    totalWrittenBytes);
-            metricRegistry.register("parquet.writer.flushed.bytes",
-                    totalFlushedBytes);
+            metricRegistry.register("parquet.writer.written.records", totalWrittenRecords);
+            metricRegistry.register("parquet.writer.flushed.records", totalFlushedRecords);
+            metricRegistry.register("parquet.writer.written.bytes", totalWrittenBytes);
+            metricRegistry.register("parquet.writer.flushed.bytes", totalFlushedBytes);
         }
     }
 
