@@ -1,5 +1,7 @@
 # Kafka Proto Parquet Writer
-Kafka proto parquet writer reads records from a Kafka topic and writes them as parquet files. Parquet files can be created on local file system or HDFS. It can read and write records in multiple threads. As writing to single parquet file can not be done concurrently, each threads writes to a separate file. 
+Kafka proto parquet writer reads records from a Kafka topic and writes them as parquet files. Parquet files can be created on local file system or HDFS. It can write records in multiple threads. As writing to single parquet file can not be done concurrently, each threads writes to a separate file. 
+
+Kafka proto parquet writer uses [Smart Commit Kafka Consumer](https://github.com/sahabpardaz/smart-commit-kafka-consumer) module for reading records from kafka.
 
 Each thread creates new parquet files when certain criteria have been met in output file. Currently these policies are supported for closing a file and opening a new one:
 
@@ -21,8 +23,9 @@ Map<String, Object>  consumerConfig = ImmutableMap.<String, Object>builder()
 
 
 KafkaProtoParquetWriter<SampleMessage> writer =
-        new Builder<>("TestParquetWriter", "topic", consumerConfig, "/tmp/parquetFiles",
-                      SampleMessage.class, SampleMessage.PARSER)
+        new Builder<>("TestParquetWriter", "topic", consumerConfig, smartCommitOffsetTrackerPageSize,
+        smartCommitOffsetTrackerMaxOpenPagesPerPartition, SmartCommitMaxQueuedFiles, "/tmp/parquetFiles",
+        SampleMessage.class, SampleMessage.PARSER)
                 .threadCount(1)
                 .maxRecordsInFile(1_000_000)
                 .maxFileOpenDuration(15, TimeUnit.MINUTES)

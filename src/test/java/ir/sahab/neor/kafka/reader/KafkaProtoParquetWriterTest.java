@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -52,6 +51,9 @@ public class KafkaProtoParquetWriterTest {
     private static final String TOPIC = "proto-source";
     private static final String INSTANCE_NAME = "TestParquetWriter";
     private static HdfsConfiguration hdfsConfig = new HdfsConfiguration();
+    private int defaultOffsetTrackerPageSize = 100000;
+    private int defaultOffsetTrackerMaxOpenPagesPerPartition = 1000;
+    private int defaultMaxQueuedFiles = 100000;
 
 
     @ClassRule
@@ -86,7 +88,7 @@ public class KafkaProtoParquetWriterTest {
     }
 
     @Before
-    public void setUp() throws IOException {
+    public void setUp() {
         consumerConfig = ImmutableMap.<String, Object>builder()
                 .put(ConsumerConfig.GROUP_ID_CONFIG, RandomStringUtils.randomAlphabetic(6))
                 .put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
@@ -105,7 +107,8 @@ public class KafkaProtoParquetWriterTest {
     public void testMaxRecordAndMaxOpenDuration() throws Throwable {
         final int maxRecordInFile = 30;
         Builder<SampleMessage> builder =
-                new Builder<>("TestParquetWriter", TOPIC, consumerConfig, targetPath,
+                new Builder<>("TestParquetWriter", TOPIC, consumerConfig, defaultOffsetTrackerPageSize,
+                        defaultOffsetTrackerMaxOpenPagesPerPartition, defaultMaxQueuedFiles, targetPath,
                               SampleMessage.class, SampleMessage.PARSER).threadCount(1)
                         .maxRecordsInFile(maxRecordInFile)
                         .maxFileOpenDuration(2, TimeUnit.SECONDS)
@@ -138,7 +141,8 @@ public class KafkaProtoParquetWriterTest {
         final int maxFileSize = 100 * 1024;
         final int messageCount = 1000;
         Builder<SampleMessage> builder =
-                new Builder<>(INSTANCE_NAME, TOPIC, consumerConfig, targetPath,
+                new Builder<>(INSTANCE_NAME, TOPIC, consumerConfig, defaultOffsetTrackerPageSize,
+                        defaultOffsetTrackerMaxOpenPagesPerPartition, defaultMaxQueuedFiles, targetPath,
                               SampleMessage.class, SampleMessage.PARSER).threadCount(1)
                                 .hadoopConf(hdfsConfig)
                                 .blockSize(10 * 1024)
@@ -171,7 +175,8 @@ public class KafkaProtoParquetWriterTest {
         String directoryDateTimePattern = "yyyy/dd";
         final int maxRecordsInFile = 10;
         Builder<SampleMessage> builder =
-                new Builder<>(INSTANCE_NAME, TOPIC, consumerConfig, targetPath,
+                new Builder<>(INSTANCE_NAME, TOPIC, consumerConfig, defaultOffsetTrackerPageSize,
+                        defaultOffsetTrackerMaxOpenPagesPerPartition, defaultMaxQueuedFiles, targetPath,
                               SampleMessage.class, SampleMessage.PARSER).threadCount(1)
                         .hadoopConf(hdfsConfig)
                         .maxRecordsInFile(maxRecordsInFile)
