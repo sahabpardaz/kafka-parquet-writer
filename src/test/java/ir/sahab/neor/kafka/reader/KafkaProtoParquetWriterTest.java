@@ -50,9 +50,7 @@ public class KafkaProtoParquetWriterTest {
 
     private static final String TOPIC = "proto-source";
     private static final String INSTANCE_NAME = "TestParquetWriter";
-    private static final int DEFAULT_OFFSET_TRACKER_PAGE_SIZE = 1000;
-    private static final int DEFAULT_OFFSET_TRACKER_MAX_OPEN_PAGES_PER_PARTITION = 10;
-    private static final int DEFAULT_MAX_EXPECTED_THROUGHPUT_PER_SECOND = 500;
+    private static final int DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS = 2;
     private static HdfsConfiguration hdfsConfig = new HdfsConfiguration();
 
 
@@ -103,18 +101,24 @@ public class KafkaProtoParquetWriterTest {
      * Test maxFileOperationDuration configs. It also checks validity of records written to parquet files.
      */
     @Test
-    public void testMaxOpenDuration() throws Throwable {
+public void testMaxOpenDuration() throws Throwable {
         Builder<SampleMessage> builder =
-                new Builder<>("TestParquetWriter", TOPIC, consumerConfig, DEFAULT_OFFSET_TRACKER_PAGE_SIZE,
-                        DEFAULT_OFFSET_TRACKER_MAX_OPEN_PAGES_PER_PARTITION, 2,
-                        DEFAULT_MAX_EXPECTED_THROUGHPUT_PER_SECOND,targetPath, SampleMessage.class,
-                        SampleMessage.PARSER).threadCount(1)
-                        .hadoopConf(hdfsConfig);
+                new Builder<SampleMessage>()
+                        .threadCount(1)
+                        .hadoopConf(hdfsConfig)
+                        .instanceName(INSTANCE_NAME)
+                        .topicName(TOPIC)
+                        .consumerConfig(consumerConfig)
+                        .maxFileOpenDurationSeconds(DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS)
+                        .targetDir(targetPath)
+                        .protoClass(SampleMessage.class)
+                        .parser(SampleMessage.PARSER);
 
         ArrayList<SampleMessage> messages;
         try (KafkaProtoParquetWriter<SampleMessage> writer = builder.build()) {
             writer.start();
-            messages = sendSampleMessages(DEFAULT_MAX_EXPECTED_THROUGHPUT_PER_SECOND);
+            // We send few messages (100) that we ensure to the max file size (1 GB) is not reached.
+            messages = sendSampleMessages(100);
             // We should have one file, that is closed base on max open duration.
             waitForFiles(1);
         }
@@ -137,13 +141,18 @@ public class KafkaProtoParquetWriterTest {
         final int maxFileSize = 100 * 1024;
         final int messageCount = 1000;
         Builder<SampleMessage> builder =
-                new Builder<>(INSTANCE_NAME, TOPIC, consumerConfig, DEFAULT_OFFSET_TRACKER_PAGE_SIZE,
-                        DEFAULT_OFFSET_TRACKER_MAX_OPEN_PAGES_PER_PARTITION, 2,
-                        DEFAULT_MAX_EXPECTED_THROUGHPUT_PER_SECOND,
-                        targetPath, SampleMessage.class, SampleMessage.PARSER).threadCount(1)
-                                .hadoopConf(hdfsConfig)
-                                .blockSize(10 * 1024)
-                                .maxFileSize(maxFileSize);
+                new Builder<SampleMessage>()
+                        .threadCount(1)
+                        .hadoopConf(hdfsConfig)
+                        .instanceName(INSTANCE_NAME)
+                        .topicName(TOPIC)
+                        .consumerConfig(consumerConfig)
+                        .maxFileOpenDurationSeconds(DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS)
+                        .targetDir(targetPath)
+                        .protoClass(SampleMessage.class)
+                        .parser(SampleMessage.PARSER)
+                        .blockSize(10 * 1024)
+                        .maxFileSize(maxFileSize);
         try (KafkaProtoParquetWriter<SampleMessage> writer = builder.build()) {
             writer.start();
             while (findFiles().size() < 2) {
@@ -170,18 +179,25 @@ public class KafkaProtoParquetWriterTest {
     public void testDirectoryDateTimePattern() throws Throwable {
         // Creating and starting parquet writer instance
         String directoryDateTimePattern = "yyyy/dd";
+
         Builder<SampleMessage> builder =
-                new Builder<>(INSTANCE_NAME, TOPIC, consumerConfig, DEFAULT_OFFSET_TRACKER_PAGE_SIZE,
-                        DEFAULT_OFFSET_TRACKER_MAX_OPEN_PAGES_PER_PARTITION, 2,
-                        DEFAULT_MAX_EXPECTED_THROUGHPUT_PER_SECOND, targetPath, SampleMessage.class, SampleMessage.PARSER).threadCount(1)
+                new Builder<SampleMessage>()
+                        .threadCount(1)
                         .hadoopConf(hdfsConfig)
+                        .instanceName(INSTANCE_NAME)
+                        .topicName(TOPIC)
+                        .consumerConfig(consumerConfig)
+                        .maxFileOpenDurationSeconds(DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS)
+                        .targetDir(targetPath)
+                        .protoClass(SampleMessage.class)
+                        .parser(SampleMessage.PARSER)
                         .directoryDateTimePattern(directoryDateTimePattern);
         final int fileCount = 1;
         List<SampleMessage> messages;
         try (KafkaProtoParquetWriter<SampleMessage> writer = builder.build()) {
             writer.start();
             // Sending message and waiting for parquet files to be created
-            messages = sendSampleMessages(DEFAULT_MAX_EXPECTED_THROUGHPUT_PER_SECOND * 2);
+            messages = sendSampleMessages(100);
             waitForFiles(fileCount);
         }
 
