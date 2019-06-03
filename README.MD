@@ -16,8 +16,7 @@ A file is closed when any of configured threshold has been reached.
 ```
 Map<String, Object>  consumerConfig = ImmutableMap.<String, Object>builder()
         .put(ConsumerConfig.GROUP_ID_CONFIG, "sample-groupId"
-        .put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-                StringDeserializer.class.getName())
+        .put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName())
         .put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "kafka-sever:9092")
         .put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest")
         .build();
@@ -28,7 +27,7 @@ KafkaProtoParquetWriter<SampleMessage> writer = new Builder<SampleMessage>()
         .kafkaTopicName("topic")
         .targetDir("/tmp/parquetFiles")
         .protoClass(SampleMessage.class)
-        .parser(SampleMessage.PARSER)
+        .parser(SampleMessage.PARSER) // Use sampleMessage.parser() instead if it is produced by protobuf v3 and later.
         .build();
 writer.start();
 ```

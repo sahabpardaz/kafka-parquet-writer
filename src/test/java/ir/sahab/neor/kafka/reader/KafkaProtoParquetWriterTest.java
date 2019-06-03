@@ -104,7 +104,6 @@ public class KafkaProtoParquetWriterTest {
 public void testMaxOpenDuration() throws Throwable {
         Builder<SampleMessage> builder =
                 new Builder<SampleMessage>()
-                        .threadCount(1)
                         .hadoopConf(hdfsConfig)
                         .instanceName(INSTANCE_NAME)
                         .topicName(TOPIC)
@@ -142,7 +141,6 @@ public void testMaxOpenDuration() throws Throwable {
         final int messageCount = 1000;
         Builder<SampleMessage> builder =
                 new Builder<SampleMessage>()
-                        .threadCount(1)
                         .hadoopConf(hdfsConfig)
                         .instanceName(INSTANCE_NAME)
                         .topicName(TOPIC)
@@ -182,7 +180,6 @@ public void testMaxOpenDuration() throws Throwable {
 
         Builder<SampleMessage> builder =
                 new Builder<SampleMessage>()
-                        .threadCount(1)
                         .hadoopConf(hdfsConfig)
                         .instanceName(INSTANCE_NAME)
                         .topicName(TOPIC)

@@ -471,13 +471,13 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         private int offsetTrackerPageSize = 300_000;
         private int offsetTrackerMaxOpenPagesPerPartition = 0; // If not set, it will be selected based on other configs
         private int maxQueuedRecordsInConsumer = 100_000;
-        // Configs related to Kafka consumer
         private Map<String, Object> consumerConfig;
         private String topic;
 
         // Configs related to parquet blocks
         private int blockSize = ParquetWriter.DEFAULT_BLOCK_SIZE;
         private int pageSize = ParquetWriter.DEFAULT_BLOCK_SIZE;
+
         // Configs related to hdfs
         private Configuration hadoopConf = new Configuration();
 
@@ -494,7 +494,8 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         public Builder() {}
 
         /**
-         * @param instanceName instance name for
+         * @param instanceName name of this parquet writer instance
+         * If it is not set, its default value will be used.
          */
         public Builder<T> instanceName(String instanceName) {
             Validate.notEmpty(instanceName, "instance name can not be null/empty");
@@ -504,6 +505,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
 
         /**
          * @param threadCount number of concurrent threads used for writing parquet file. Default value is 1.
+         * If it is not set, its default value will be used.
          */
         public Builder<T> threadCount(int threadCount) {
             Validate.isTrue(threadCount > 0, "Thread count must be a positive number.");
@@ -522,6 +524,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         /**
          * @param maxFileOpenDurationSeconds maximum time each file is kept open in seconds, after this
          * time data of current file will be flushed and next file will be created.
+         * If it is not set, its default value will be used.
          */
         public Builder<T> maxFileOpenDurationSeconds(int maxFileOpenDurationSeconds) {
             Validate.isTrue(maxFileOpenDurationSeconds > 0, "Maximum duration of file must be positive number.");
@@ -532,6 +535,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         /**
          * @param maxFileSize maximum size of parquet files. Zero means no limitation. Default value is 0. <br/>
          * Due to file format overheads this value must be >= {{@link #MIN_MAX_FILE_SIZE}}
+         * If it is not set, its default value will be used.
          */
         public Builder<T> maxFileSize(long maxFileSize) {
             Validate.isTrue(maxFileSize >= MIN_MAX_FILE_SIZE);
@@ -540,7 +544,12 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         }
 
         /**
-         * @param maxExpectedThroughputPerSecond maximum expected records that must be processed per second.
+         * @param maxExpectedThroughputPerSecond maximum expected records that may be processed per second.
+         * This value does not cause any functional behavior. It is just used to check validity of other performance
+         * related configs. In order to avoid temporary pause due to saturation of offset tracker pages,
+         * this equation should be satisfied: {@code offsetTrackerPageSize * offsetTrackerMaxOpenPagesPerPartition >=
+         * maxExpectedThroughputPerSecond * maxFileOpenDurationSeconds}
+         * If it is not set, its default value will be used.
          */
         public Builder<T> maxExpectedThroughputPerSecond(int maxExpectedThroughputPerSecond) {
             Validate.isTrue(maxExpectedThroughputPerSecond > 0, "Maximum expected throughput"
@@ -550,9 +559,10 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         }
 
         /**
-         * @param offsetTrackerPageSize is used in smart kafka commit, the size of each page in offset tracker.
+         * @param offsetTrackerPageSize is used in smart kafka consumer, the size of each page in offset tracker.
          * Offsets will be committed just when some consecutive pages become fully acked. In fact lower page sizes,
          * causes more frequent commits.
+         * If it is not set, its default value will be used.
          */
         public Builder<T> offsetTrackerPageSize(int offsetTrackerPageSize) {
             Validate.isTrue(offsetTrackerPageSize > 0, "offset tracker page size must be positive number.");
@@ -561,13 +571,14 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         }
 
         /**
-         * @param offsetTrackerMaxOpenPagesPerPartition is used in smart kafka commit, maximum number of open
+         * @param offsetTrackerMaxOpenPagesPerPartition is used in smart kafka consumer, maximum number of open
          * pages (pages which have tracked but not acked offsets). After reaching to this limit on a partition,
          * reading from Kafka topic will be blocked, waiting for receiving more pending acks from the client.
          * A good choice is to completely avoid this kind of blockage. For this reason, it is
          * sufficient to satisfy this equation:
          * <pre> (pageSize * maxOpenPages * numPartitions) > (maximum number of pending records) </pre>
          * In the above equation, by pending records we mean the ones which are polled but not yet acked.
+         * Note: if its value is not provided by user, it will be chosen automatically based on other parameters.
          */
         public Builder<T> offsetTrackerMaxOpenPagesPerPartition(int offsetTrackerMaxOpenPagesPerPartition) {
             Validate.isTrue(offsetTrackerMaxOpenPagesPerPartition >= 0,
@@ -577,8 +588,9 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         }
 
         /**
-         * @param maxQueuedRecordsInConsumer is used in smart kafka commit, maximum number of records
+         * @param maxQueuedRecordsInConsumer is used in smart kafka consumer, maximum number of records
          * which can be queued to be later polled by the client.
+         * If it is not set, its default value will be used.
          */
         public Builder<T> maxQueuedRecordsInConsumer(int maxQueuedRecordsInConsumer) {
             Validate.isTrue(maxQueuedRecordsInConsumer > 0, "Maximum queued records in consumer cannot be negative.");
@@ -606,6 +618,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
 
         /**
          * @param blockSize HDFS block size of parquet files
+         * If it is not set, its default value will be used.
          */
         public Builder<T> blockSize(int blockSize) {
             Validate.isTrue(blockSize > 0, "Block size must be a positive number.");
@@ -615,6 +628,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
 
         /**
          * @param pageSize page size of generated parquet files
+         * If it is not set, its default value will be used.
          */
         public Builder<T> pageSize(int pageSize) {
             Validate.isTrue(pageSize > 0, "Page size must be a positive number.");
@@ -648,6 +662,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
 
         /**
          * @param compressionCodecName name of compression codec used in parquet files
+         * If it is not set, its default value will be used.
          */
         public Builder<T> compressionCodecName(CompressionCodecName compressionCodecName) {
             Validate.notNull(compressionCodecName, "Compression codec cannot be null.");
@@ -656,8 +671,8 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         }
 
         /**
-         * Sets date pattern used to create directory inside target directory.
-         *
+         * Sets date pattern used to create directory inside target directory. This pattern is required if
+         * the parquet files should be categorized according to their time (time of closing a file).
          * @param directoryDateTimePattern pattern used to create directory from, see {@link DateTimeFormatter}
          * for format. null value disables directory creation.
          * @throws IllegalArgumentException if pattern is invalid
@@ -672,6 +687,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
 
         /**
          * @param enableDictionary whether to enable dictionary in parquet files or not
+         * If it is not set, its default value will be used.
          */
         public Builder<T> enableDictionary(boolean enableDictionary) {
             this.enableDictionary = enableDictionary;
@@ -691,13 +707,13 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
             Validate.notEmpty(topic, "kafka topic name must be set.");
             Validate.notNull(protoClass, "Proto message class must be set.");
             Validate.notNull(parser, "Proto message parser must be set.");
+            Validate.notEmpty(targetDir, "target directory must be set");
 
-            if(offsetTrackerMaxOpenPagesPerPartition == 0) {
-                //calculate the number of offset tracker maximum pages per partition
+            if (offsetTrackerMaxOpenPagesPerPartition == 0) {
+                // Calculate the number of offset tracker maximum pages per partition
                 offsetTrackerMaxOpenPagesPerPartition = (int) Math.ceil(
                         maxExpectedThroughputPerSecond * maxFileOpenDurationSeconds * 1.0 / offsetTrackerPageSize);
-            }
-            else{
+            } else {
                 Validate.isTrue(offsetTrackerPageSize * offsetTrackerMaxOpenPagesPerPartition >=
                                 maxExpectedThroughputPerSecond * maxFileOpenDurationSeconds,
                         "\"offsetTrackerPageSize * offsetTrackerMaxOpenPagesPerPartition >= "
