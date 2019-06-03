@@ -6,13 +6,27 @@
 
     <groupId>ir.sahab</groupId>
     <artifactId>kafka-parquet-writer</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
 
     <properties>
         <hadoop.version>2.7.7</hadoop.version>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
     <dependencies>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>11.0.2</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
@@ -74,6 +88,12 @@
             <artifactId>spring-kafka-test</artifactId>
             <version>2.1.7.RELEASE</version>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.sahabpardaz</groupId>
+            <artifactId>smart-commit-kafka-consumer</artifactId>
+            <version>1.0.0</version>
         </dependency>
     </dependencies>
     <build>
