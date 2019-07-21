@@ -1,4 +1,4 @@
-package ir.sahab.neor.kafka.reader;
+package ir.sahab.kafka.reader;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.greaterThan;
@@ -7,11 +7,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableMap;
-import ir.sahab.neor.kafka.parquet.HdfsTestUtil;
-import ir.sahab.neor.kafka.parquet.ParquetTestUtils;
-import ir.sahab.neor.kafka.parquet.TemporaryHdfsDirectory;
-import ir.sahab.neor.kafka.reader.KafkaProtoParquetWriter.Builder;
-import ir.sahab.neor.kafka.test.proto.TestMessage.SampleMessage;
+import ir.sahab.kafka.parquet.HdfsTestUtil;
+import ir.sahab.kafka.parquet.ParquetTestUtils;
+import ir.sahab.kafka.parquet.TemporaryHdfsDirectory;
+import ir.sahab.kafka.reader.KafkaProtoParquetWriter.Builder;
+import ir.sahab.kafka.test.proto.TestMessage.SampleMessage;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;

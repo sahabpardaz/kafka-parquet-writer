@@ -1,4 +1,4 @@
-package ir.sahab.neor.kafka.reader;
+package ir.sahab.kafka.reader;
 
 import com.google.protobuf.Message;
 import java.io.IOException;

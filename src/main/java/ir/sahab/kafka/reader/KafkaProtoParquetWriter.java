@@ -1,4 +1,4 @@
-package ir.sahab.neor.kafka.reader;
+package ir.sahab.kafka.reader;
 
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
@@ -6,9 +6,9 @@ import com.codahale.metrics.MetricRegistry;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.Parser;
+import ir.sahab.kafka.reader.ParquetFile.ParquetProperties;
 import ir.sahab.kafkaconsumer.PartitionOffset;
 import ir.sahab.kafkaconsumer.SmartCommitKafkaConsumer;
-import ir.sahab.neor.kafka.reader.ParquetFile.ParquetProperties;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -52,8 +52,7 @@ import org.slf4j.LoggerFactory;
  *         Open Time: When a file has been open for certain amount of time
  *     </li>
  * </ul>
- *  Names of finalized files will be in dateTime_instanceName_shardIndex.parquet format, which dateTime is in
- * {@link #fileDateTimePattern} format.<br>
+ *  Names of finalized files will be in timestamp_instanceName_shardIndex.parquet format.<br>
  * Files can optionally be put in separate directories based on the time it has been finalized.
  * Format of these directories can be configured using
  * {@link Builder#directoryDateTimePattern(String)}.
@@ -83,10 +82,6 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
     private final Path targetDir;
     // finalized parquet file extension
     private final String parquetFileExtension;
-    // file date time pattern
-    private final String fileDateTimePattern;
-    // used for formatting date & time for parquet file name
-    private final DateTimeFormatter fileNameDateTimeFormatter;
     // Proto message parser used to parse messages
     private final Parser<T> parser;
 
@@ -142,9 +137,6 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         Validate.isTrue(!defaultFs.isEmpty());
         targetDir = new Path(defaultFs, builder.targetDir);
         parquetFileExtension = builder.parquetFileExtension;
-        fileDateTimePattern = builder.fileDateTimePattern;
-        fileNameDateTimeFormatter = DateTimeFormatter.ofPattern(fileDateTimePattern, Locale.getDefault())
-                .withZone(ZoneId.systemDefault());
 
         MetricRegistry metricRegistry = builder.metricRegistry;
         if (metricRegistry != null) {
@@ -315,7 +307,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
          * @return name for a new parquet file
          */
         private String newFileName() {
-            return fileNameDateTimeFormatter.format(Instant.now()) + "_" + instanceName + "_"
+            return Instant.now().getEpochSecond() + "_" + instanceName + "_"
                    + index + parquetFileExtension;
         }
 
@@ -495,7 +487,6 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         //Configs related to parquet files
         private CompressionCodecName compressionCodecName = CompressionCodecName.UNCOMPRESSED;
         private DateTimeFormatter directoryDateTimeFormatter;
-        private String fileDateTimePattern = "yyyyMMdd-HHmmssSSS-zzz";
         private String parquetFileExtension = ".parquet";
         private boolean enableDictionary = true;
         private String targetDir;
@@ -701,16 +692,6 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
                     ? null
                     : DateTimeFormatter.ofPattern(directoryDateTimePattern, Locale.getDefault())
                             .withZone(ZoneId.systemDefault());
-            return this;
-        }
-
-        /**
-         * Sets file date pattern used to create file inside target directory.
-         * @param fileDateTimePattern pattern used to create parquet file from
-         * If it is not set, its default value will be used.
-         */
-        public Builder<T> fileDateTimePattern(String fileDateTimePattern) {
-            this.fileDateTimePattern = fileDateTimePattern;
             return this;
         }
 

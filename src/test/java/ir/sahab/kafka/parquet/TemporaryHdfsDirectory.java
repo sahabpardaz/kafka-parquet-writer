@@ -1,4 +1,4 @@
-package ir.sahab.neor.kafka.parquet;
+package ir.sahab.kafka.parquet;
 
 import java.io.IOException;
 import org.apache.commons.lang3.RandomStringUtils;

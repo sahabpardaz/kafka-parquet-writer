@@ -1,4 +1,4 @@
-package ir.sahab.neor.kafka.parquet;
+package ir.sahab.kafka.parquet;
 
 import com.google.protobuf.GeneratedMessage;
 import java.io.IOException;
