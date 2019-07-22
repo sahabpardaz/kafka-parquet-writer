@@ -1,4 +1,4 @@
-package ir.sahab.neor.kafka.reader;
+package ir.sahab.kafka.reader;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.greaterThan;
@@ -7,11 +7,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableMap;
-import ir.sahab.neor.kafka.parquet.HdfsTestUtil;
-import ir.sahab.neor.kafka.parquet.ParquetTestUtils;
-import ir.sahab.neor.kafka.parquet.TemporaryHdfsDirectory;
-import ir.sahab.neor.kafka.reader.KafkaProtoParquetWriter.Builder;
-import ir.sahab.neor.kafka.test.proto.TestMessage.SampleMessage;
+import ir.sahab.kafka.parquet.HdfsTestUtil;
+import ir.sahab.kafka.parquet.ParquetTestUtils;
+import ir.sahab.kafka.parquet.TemporaryHdfsDirectory;
+import ir.sahab.kafka.reader.KafkaProtoParquetWriter.Builder;
+import ir.sahab.kafka.test.proto.TestMessage.SampleMessage;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -50,6 +50,7 @@ public class KafkaProtoParquetWriterTest {
 
     private static final String TOPIC = "proto-source";
     private static final String INSTANCE_NAME = "TestParquetWriter";
+    private static final String DEFAULT_PARQUET_FILE_EXTENSION = ".parquet";
     private static final int DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS = 2;
     private static HdfsConfiguration hdfsConfig = new HdfsConfiguration();
 
@@ -102,6 +103,7 @@ public class KafkaProtoParquetWriterTest {
      */
     @Test
 public void testMaxOpenDuration() throws Throwable {
+        String parquetFileExtension = ".p";
         Builder<SampleMessage> builder =
                 new Builder<SampleMessage>()
                         .hadoopConf(hdfsConfig)
@@ -110,6 +112,7 @@ public void testMaxOpenDuration() throws Throwable {
                         .consumerConfig(consumerConfig)
                         .maxFileOpenDurationSeconds(DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS)
                         .targetDir(targetPath)
+                        .parquetFileExtension(parquetFileExtension)
                         .protoClass(SampleMessage.class)
                         .parser(SampleMessage.PARSER);
 
@@ -119,10 +122,10 @@ public void testMaxOpenDuration() throws Throwable {
             // We send few messages (100) that we ensure to the max file size (1 GB) is not reached.
             messages = sendSampleMessages(100);
             // We should have one file, that is closed base on max open duration.
-            waitForFiles(1);
+            waitForFiles(1, parquetFileExtension);
         }
 
-        List<LocatedFileStatus> files = findFiles();
+        List<LocatedFileStatus> files = findFiles(parquetFileExtension);
         assertEquals(1, files.size());
         for (LocatedFileStatus file : files) {
             assertThat(file.getLen(), greaterThan(0L));
@@ -153,11 +156,11 @@ public void testMaxOpenDuration() throws Throwable {
                         .maxFileSize(maxFileSize);
         try (KafkaProtoParquetWriter<SampleMessage> writer = builder.build()) {
             writer.start();
-            while (findFiles().size() < 2) {
+            while (findFiles(DEFAULT_PARQUET_FILE_EXTENSION).size() < 2) {
                 sendSampleMessages(messageCount);
             }
         }
-        List<LocatedFileStatus> files = findFiles();
+        List<LocatedFileStatus> files = findFiles(DEFAULT_PARQUET_FILE_EXTENSION);
         files.sort(Comparator.comparing(LocatedFileStatus::getLen));
         for (LocatedFileStatus file : files) {
             assertThat(file.getLen(), greaterThan(0L));
@@ -195,7 +198,7 @@ public void testMaxOpenDuration() throws Throwable {
             writer.start();
             // Sending message and waiting for parquet files to be created
             messages = sendSampleMessages(100);
-            waitForFiles(fileCount);
+            waitForFiles(fileCount, DEFAULT_PARQUET_FILE_EXTENSION);
         }
 
         // Checking parquet files are created in correct path
@@ -203,7 +206,7 @@ public void testMaxOpenDuration() throws Throwable {
                 DateTimeFormatter.ofPattern(directoryDateTimePattern, Locale.getDefault())
                         .withZone(ZoneId.systemDefault())
                         .format(Instant.now());
-        List<LocatedFileStatus> files = findFiles();
+        List<LocatedFileStatus> files = findFiles(DEFAULT_PARQUET_FILE_EXTENSION);
         for (LocatedFileStatus file : files) {
             assertThat(file.getLen(), greaterThan(0L));
             assertEquals(new Path(directory.getPath(), expectedDir), file.getPath().getParent());
@@ -219,8 +222,8 @@ public void testMaxOpenDuration() throws Throwable {
     /**
      * Waits till given number of files are created.
      */
-    private void waitForFiles(int fileCount) throws InterruptedException, IOException {
-        while (findFiles().size() < fileCount) {
+    private void waitForFiles(int fileCount, String parquetFileExtension) throws InterruptedException, IOException {
+        while (findFiles(parquetFileExtension).size() < fileCount) {
             Thread.sleep(1);
         }
     }
@@ -230,9 +233,8 @@ public void testMaxOpenDuration() throws Throwable {
      *
      * @return list of found files
      */
-    private List<LocatedFileStatus> findFiles() throws IOException {
-        return HdfsTestUtil.listFiles(hdfsConfig, directory.getPath(),
-                                      KafkaProtoParquetWriter.PARQUET_FILE_EXTENSION, true);
+    private List<LocatedFileStatus> findFiles(String parquetFileExtension) throws IOException {
+        return HdfsTestUtil.listFiles(hdfsConfig, directory.getPath(), parquetFileExtension, true);
     }
 
     /**
@@ -259,7 +261,7 @@ public void testMaxOpenDuration() throws Throwable {
                 ProducerRecord<Long, byte[]> record =
                         new ProducerRecord<>(TOPIC, (long) i, message.toByteArray());
                 producer.send(record,
-                    (metadata, exception) -> Assert.assertTrue(exception == null));
+                    (metadata, exception) -> Assert.assertNull(exception));
                 list.add(message);
             }
         }
