@@ -307,8 +307,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
          * @return name for a new parquet file
          */
         private String newFileName() {
-            return Instant.now().getEpochSecond() + "_" + instanceName + "_"
-                   + index + parquetFileExtension;
+            return Instant.now().toEpochMilli() + "_" + instanceName + "_" + index + parquetFileExtension;
         }
 
         /**

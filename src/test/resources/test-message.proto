@@ -1,0 +1,10 @@
+syntax = "proto2";
+option java_package = "ir.sahab.kafka.test.proto";
+option java_outer_classname = "TestMessage";
+
+message SampleMessage {
+  required string query = 1;
+  required int64 timestamp = 2;
+  optional int32 page_number = 3;
+  optional int32 result_per_page = 4;
+}
