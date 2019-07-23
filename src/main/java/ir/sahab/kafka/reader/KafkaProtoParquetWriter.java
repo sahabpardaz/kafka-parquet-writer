@@ -231,8 +231,9 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
 
         WorkerThread(int index) {
             this.index = index;
+            String tempDir = targetDir.toString().endsWith("/") ? "tmp" : "/tmp";
             temporaryFilePath =
-                    new Path(targetDir, instanceName + "_" + index + "_" + random.nextLong() + TEMP_FILE_EXTENSION);
+                    new Path(targetDir + tempDir, instanceName + "_" + index + "_" + random.nextLong() + TEMP_FILE_EXTENSION);
         }
 
         /**
