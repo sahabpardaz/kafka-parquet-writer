@@ -395,9 +395,6 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
                             "Unexpected interrupt while joining thread.", e);
                 }
             }
-            if (smartCommitKafkaConsumer != null) {
-                smartCommitKafkaConsumer.close();
-            }
             logger.info("Parquet writer worker thread {} closed.", index);
         }
     }
