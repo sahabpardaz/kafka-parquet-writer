@@ -1,4 +1,2 @@
 dist: xenial
 jdk: openjdk8
-script:
-  - jdk_switcher use openjdk8
