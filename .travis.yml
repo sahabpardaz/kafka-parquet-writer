@@ -1,7 +1,8 @@
+dist: xenial
+
 before_install:
   - sudo apt-get update
   - sudo apt-get install default-jdk
   - echo $JAVA_HOME
 
-dist: xenial
-language: java
+#language: java
