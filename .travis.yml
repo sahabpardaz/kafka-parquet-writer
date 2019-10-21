@@ -1,8 +1,7 @@
 dist: xenial
-
-before_install:
-  - sudo apt-get update
-  - sudo apt-get install default-jdk
-  - echo $JAVA_HOME
-
-#language: java
+language: java
+jdk:
+  - openjdk8
+env:
+  - PATH=$(echo "$PATH" | sed -e 's/:\/usr\/local\/lib\/jvm\/openjdk11\/bin//')
+  - JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
