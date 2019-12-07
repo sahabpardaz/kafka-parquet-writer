@@ -1,4 +1,4 @@
-package ir.sahab.neor.kafka.reader;
+package ir.sahab.kafka.reader;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.greaterThan;
@@ -7,11 +7,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 import com.google.common.collect.ImmutableMap;
-import ir.sahab.neor.kafka.parquet.HdfsTestUtil;
-import ir.sahab.neor.kafka.parquet.ParquetTestUtils;
-import ir.sahab.neor.kafka.parquet.TemporaryHdfsDirectory;
-import ir.sahab.neor.kafka.reader.KafkaProtoParquetWriter.Builder;
-import ir.sahab.neor.kafka.test.proto.TestMessage.SampleMessage;
+import ir.sahab.kafka.parquet.HdfsTestUtil;
+import ir.sahab.kafka.parquet.ParquetTestUtils;
+import ir.sahab.kafka.parquet.TemporaryHdfsDirectory;
+import ir.sahab.kafka.reader.KafkaProtoParquetWriter.Builder;
+import ir.sahab.kafka.test.proto.TestMessage.SampleMessage;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -51,6 +50,8 @@ public class KafkaProtoParquetWriterTest {
 
     private static final String TOPIC = "proto-source";
     private static final String INSTANCE_NAME = "TestParquetWriter";
+    private static final String DEFAULT_PARQUET_FILE_EXTENSION = ".parquet";
+    private static final int DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS = 2;
     private static HdfsConfiguration hdfsConfig = new HdfsConfiguration();
 
 
@@ -86,7 +87,7 @@ public class KafkaProtoParquetWriterTest {
     }
 
     @Before
-    public void setUp() throws IOException {
+    public void setUp() {
         consumerConfig = ImmutableMap.<String, Object>builder()
                 .put(ConsumerConfig.GROUP_ID_CONFIG, RandomStringUtils.randomAlphabetic(6))
                 .put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
@@ -98,30 +99,34 @@ public class KafkaProtoParquetWriterTest {
     }
 
     /**
-     * Tests maxRecordInFile, maxFileOperationDuration configs. It also checks validity of
-     * records written to parquet files.
+     * Test maxFileOperationDuration configs. It also checks validity of records written to parquet files.
      */
     @Test
-    public void testMaxRecordAndMaxOpenDuration() throws Throwable {
-        final int maxRecordInFile = 30;
+public void testMaxOpenDuration() throws Throwable {
+        String parquetFileExtension = ".p";
         Builder<SampleMessage> builder =
-                new Builder<>("TestParquetWriter", TOPIC, consumerConfig, targetPath,
-                              SampleMessage.class, SampleMessage.PARSER).threadCount(1)
-                        .maxRecordsInFile(maxRecordInFile)
-                        .maxFileOpenDuration(2, TimeUnit.SECONDS)
-                        .hadoopConf(hdfsConfig);
+                new Builder<SampleMessage>()
+                        .hadoopConf(hdfsConfig)
+                        .instanceName(INSTANCE_NAME)
+                        .topicName(TOPIC)
+                        .consumerConfig(consumerConfig)
+                        .maxFileOpenDurationSeconds(DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS)
+                        .targetDir(targetPath)
+                        .parquetFileExtension(parquetFileExtension)
+                        .protoClass(SampleMessage.class)
+                        .parser(SampleMessage.PARSER);
 
         ArrayList<SampleMessage> messages;
         try (KafkaProtoParquetWriter<SampleMessage> writer = builder.build()) {
             writer.start();
-            messages = sendSampleMessages(maxRecordInFile + maxRecordInFile / 2);
-            // We should have two files, first is full due to max records and the other one is
-            // closed base on max open duration.
-            waitForFiles(2);
+            // We send few messages (100) that we ensure to the max file size (1 GB) is not reached.
+            messages = sendSampleMessages(100);
+            // We should have one file, that is closed base on max open duration.
+            waitForFiles(1, parquetFileExtension);
         }
 
-        List<LocatedFileStatus> files = findFiles();
-        assertEquals(2, files.size());
+        List<LocatedFileStatus> files = findFiles(parquetFileExtension);
+        assertEquals(1, files.size());
         for (LocatedFileStatus file : files) {
             assertThat(file.getLen(), greaterThan(0L));
             // dateTimePattern is not given, checking if file is created at root of target directory
@@ -138,18 +143,24 @@ public class KafkaProtoParquetWriterTest {
         final int maxFileSize = 100 * 1024;
         final int messageCount = 1000;
         Builder<SampleMessage> builder =
-                new Builder<>(INSTANCE_NAME, TOPIC, consumerConfig, targetPath,
-                              SampleMessage.class, SampleMessage.PARSER).threadCount(1)
-                                .hadoopConf(hdfsConfig)
-                                .blockSize(10 * 1024)
-                                .maxFileSize(maxFileSize);
+                new Builder<SampleMessage>()
+                        .hadoopConf(hdfsConfig)
+                        .instanceName(INSTANCE_NAME)
+                        .topicName(TOPIC)
+                        .consumerConfig(consumerConfig)
+                        .maxFileOpenDurationSeconds(DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS)
+                        .targetDir(targetPath)
+                        .protoClass(SampleMessage.class)
+                        .parser(SampleMessage.PARSER)
+                        .blockSize(10 * 1024)
+                        .maxFileSize(maxFileSize);
         try (KafkaProtoParquetWriter<SampleMessage> writer = builder.build()) {
             writer.start();
-            while (findFiles().size() < 2) {
+            while (findFiles(DEFAULT_PARQUET_FILE_EXTENSION).size() < 2) {
                 sendSampleMessages(messageCount);
             }
         }
-        List<LocatedFileStatus> files = findFiles();
+        List<LocatedFileStatus> files = findFiles(DEFAULT_PARQUET_FILE_EXTENSION);
         files.sort(Comparator.comparing(LocatedFileStatus::getLen));
         for (LocatedFileStatus file : files) {
             assertThat(file.getLen(), greaterThan(0L));
@@ -169,21 +180,25 @@ public class KafkaProtoParquetWriterTest {
     public void testDirectoryDateTimePattern() throws Throwable {
         // Creating and starting parquet writer instance
         String directoryDateTimePattern = "yyyy/dd";
-        final int maxRecordsInFile = 10;
+
         Builder<SampleMessage> builder =
-                new Builder<>(INSTANCE_NAME, TOPIC, consumerConfig, targetPath,
-                              SampleMessage.class, SampleMessage.PARSER).threadCount(1)
+                new Builder<SampleMessage>()
                         .hadoopConf(hdfsConfig)
-                        .maxRecordsInFile(maxRecordsInFile)
-                        .maxFileOpenDuration(500, TimeUnit.MILLISECONDS)
+                        .instanceName(INSTANCE_NAME)
+                        .topicName(TOPIC)
+                        .consumerConfig(consumerConfig)
+                        .maxFileOpenDurationSeconds(DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS)
+                        .targetDir(targetPath)
+                        .protoClass(SampleMessage.class)
+                        .parser(SampleMessage.PARSER)
                         .directoryDateTimePattern(directoryDateTimePattern);
-        final int fileCount = 2;
+        final int fileCount = 1;
         List<SampleMessage> messages;
         try (KafkaProtoParquetWriter<SampleMessage> writer = builder.build()) {
             writer.start();
             // Sending message and waiting for parquet files to be created
-            messages = sendSampleMessages(fileCount * maxRecordsInFile);
-            waitForFiles(fileCount);
+            messages = sendSampleMessages(100);
+            waitForFiles(fileCount, DEFAULT_PARQUET_FILE_EXTENSION);
         }
 
         // Checking parquet files are created in correct path
@@ -191,7 +206,7 @@ public class KafkaProtoParquetWriterTest {
                 DateTimeFormatter.ofPattern(directoryDateTimePattern, Locale.getDefault())
                         .withZone(ZoneId.systemDefault())
                         .format(Instant.now());
-        List<LocatedFileStatus> files = findFiles();
+        List<LocatedFileStatus> files = findFiles(DEFAULT_PARQUET_FILE_EXTENSION);
         for (LocatedFileStatus file : files) {
             assertThat(file.getLen(), greaterThan(0L));
             assertEquals(new Path(directory.getPath(), expectedDir), file.getPath().getParent());
@@ -207,8 +222,8 @@ public class KafkaProtoParquetWriterTest {
     /**
      * Waits till given number of files are created.
      */
-    private void waitForFiles(int fileCount) throws InterruptedException, IOException {
-        while (findFiles().size() < fileCount) {
+    private void waitForFiles(int fileCount, String parquetFileExtension) throws InterruptedException, IOException {
+        while (findFiles(parquetFileExtension).size() < fileCount) {
             Thread.sleep(1);
         }
     }
@@ -218,9 +233,8 @@ public class KafkaProtoParquetWriterTest {
      *
      * @return list of found files
      */
-    private List<LocatedFileStatus> findFiles() throws IOException {
-        return HdfsTestUtil.listFiles(hdfsConfig, directory.getPath(),
-                                      KafkaProtoParquetWriter.PARQUET_FILE_EXTENSION, true);
+    private List<LocatedFileStatus> findFiles(String parquetFileExtension) throws IOException {
+        return HdfsTestUtil.listFiles(hdfsConfig, directory.getPath(), parquetFileExtension, true);
     }
 
     /**
@@ -247,7 +261,7 @@ public class KafkaProtoParquetWriterTest {
                 ProducerRecord<Long, byte[]> record =
                         new ProducerRecord<>(TOPIC, (long) i, message.toByteArray());
                 producer.send(record,
-                    (metadata, exception) -> Assert.assertTrue(exception == null));
+                    (metadata, exception) -> Assert.assertNull(exception));
                 list.add(message);
             }
         }
