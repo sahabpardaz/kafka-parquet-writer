@@ -101,7 +101,7 @@
         <dependency>
             <groupId>com.github.sahabpardaz</groupId>
             <artifactId>smart-commit-kafka-consumer</artifactId>
-            <version>1.0.0</version>
+            <version>1.2.0</version>
         </dependency>
     </dependencies>
     <build>
