@@ -6,7 +6,7 @@
 
     <groupId>ir.sahab</groupId>
     <artifactId>kafka-parquet-writer</artifactId>
-    <version>1.3.2</version>
+    <version>1.4.0</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -44,7 +44,7 @@
         <dependency>
             <groupId>org.apache.parquet</groupId>
             <artifactId>parquet-protobuf</artifactId>
-            <version>1.9.0</version>
+            <version>1.10.1</version>
         </dependency>
 
         <dependency>
@@ -101,7 +101,7 @@
         <dependency>
             <groupId>com.github.sahabpardaz</groupId>
             <artifactId>smart-commit-kafka-consumer</artifactId>
-            <version>1.0.0</version>
+            <version>1.2.0</version>
         </dependency>
     </dependencies>
     <build>

@@ -104,6 +104,8 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
     private final Configuration hadoopConf;
     // Pattern used for directory creation inside targetDir
     private final DateTimeFormatter directoryDateTimeFormatter;
+    // Pattern used for final parquet file name creation
+    private final DateTimeFormatter fileDateTimeFormatter;
 
     // Total written records by this writer
     private final Meter totalWrittenRecords = new Meter();
@@ -130,6 +132,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         maxFileSize = builder.maxFileSize;
         maxFileOpenDurationSeconds = builder.maxFileOpenDurationSeconds;
         directoryDateTimeFormatter = builder.directoryDateTimeFormatter;
+        fileDateTimeFormatter = builder.fileDateTimeFormatter;
 
         hadoopConf = new Configuration(builder.hadoopConf);
         String defaultFs = hadoopConf.get(DFSConfigKeys.FS_DEFAULT_NAME_KEY);
@@ -185,10 +188,10 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
     @Override
     public void close() throws IOException {
         logger.debug("Closing Kafka parquet writer '{}' of {} topic...", instanceName, topic);
-        smartCommitKafkaConsumer.close();
         for (WorkerThread worker : workerThreads) {
             worker.close();
         }
+        smartCommitKafkaConsumer.close();
         logger.info("Kafka parquet writer '{}' of {} topic closed.", instanceName, topic);
     }
 
@@ -308,7 +311,10 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
          * @return name for a new parquet file
          */
         private String newFileName() {
-            return Instant.now().toEpochMilli() + "_" + instanceName + "_" + index + parquetFileExtension;
+            return (fileDateTimeFormatter == null)
+                    ? Instant.now().toEpochMilli() + "_" + instanceName + "_" + index + parquetFileExtension
+                    : fileDateTimeFormatter.format(Instant.now()) + "_" + instanceName + "_" + index
+                            + parquetFileExtension;
         }
 
         /**
@@ -339,14 +345,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
             // Inform Kafka consumer about the records that are written. So it detects the offsets which can be
             // committed on each partition.
             if (!writtenOffsets.isEmpty()) {
-                writtenOffsets.forEach(partitionOffset -> {
-                    try {
-                        smartCommitKafkaConsumer.ack(partitionOffset);
-                    } catch (InterruptedException e) {
-                        logger.info("Acking the records on Kafka consumer interrupted.");
-                        Thread.currentThread().interrupt();
-                    }
-                });
+                writtenOffsets.forEach(smartCommitKafkaConsumer::ack);
                 writtenOffsets.clear();
             }
         }
@@ -484,6 +483,8 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         //Configs related to parquet files
         private CompressionCodecName compressionCodecName = CompressionCodecName.UNCOMPRESSED;
         private DateTimeFormatter directoryDateTimeFormatter;
+        private DateTimeFormatter fileDateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmssSSS",
+                Locale.getDefault()).withZone(ZoneId.systemDefault());
         private String parquetFileExtension = ".parquet";
         private boolean enableDictionary = true;
         private String targetDir;
@@ -497,6 +498,21 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         public Builder<T> instanceName(String instanceName) {
             Validate.notEmpty(instanceName, "instance name can not be null/empty");
             this.instanceName = instanceName;
+            return this;
+        }
+
+        /**
+         * Sets date pattern used to create parquet file. This pattern is required if
+         * the parquet files should be categorized according to their time (time of closing a file).
+         * @param fileDateTimePattern pattern used to create parquet file from, see {@link DateTimeFormatter}
+         * for format. if set to null then we use epoch of time in file name;
+         * @throws IllegalArgumentException if pattern is invalid
+         */
+        public Builder<T> fileDateTimePattern(String fileDateTimePattern) {
+            this.fileDateTimeFormatter = (fileDateTimePattern == null)
+                    ? null
+                    : DateTimeFormatter.ofPattern(fileDateTimePattern, Locale.getDefault())
+                            .withZone(ZoneId.systemDefault());
             return this;
         }
 
