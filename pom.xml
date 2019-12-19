@@ -6,7 +6,7 @@
 
     <groupId>ir.sahab</groupId>
     <artifactId>kafka-parquet-writer</artifactId>
-    <version>1.4.1</version>
+    <version>1.4.2</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -51,6 +51,12 @@
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
             <version>${hadoop.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -62,12 +68,6 @@
             <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-core</artifactId>
             <version>3.2.5</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka-clients</artifactId>
-            <version>1.0.2</version>
         </dependency>
 
         <dependency>
@@ -92,16 +92,16 @@
         </dependency>
 
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka-test</artifactId>
-            <version>2.1.7.RELEASE</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
             <groupId>com.github.sahabpardaz</groupId>
             <artifactId>smart-commit-kafka-consumer</artifactId>
             <version>1.2.1</version>
+        </dependency>
+
+        <dependency>
+          <groupId>com.github.sahabpardaz</groupId>
+          <artifactId>kafka-rule</artifactId>
+          <version>1.4.0</version>
+          <scope>test</scope>
         </dependency>
     </dependencies>
     <build>
