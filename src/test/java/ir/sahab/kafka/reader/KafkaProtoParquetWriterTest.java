@@ -12,6 +12,7 @@ import ir.sahab.kafka.parquet.ParquetTestUtils;
 import ir.sahab.kafka.parquet.TemporaryHdfsDirectory;
 import ir.sahab.kafka.reader.KafkaProtoParquetWriter.Builder;
 import ir.sahab.kafka.test.proto.TestMessage.SampleMessage;
+import ir.sahab.kafkarule.KafkaRule;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -44,7 +45,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
-import org.springframework.kafka.test.rule.KafkaEmbedded;
 
 public class KafkaProtoParquetWriterTest {
 
@@ -56,7 +56,7 @@ public class KafkaProtoParquetWriterTest {
 
 
     @ClassRule
-    public static KafkaEmbedded kafkaEmbedded = new KafkaEmbedded(1, true, TOPIC);
+    public static KafkaRule kafkaEmbedded = new KafkaRule();
 
     @ClassRule
     public static TemporaryFolder miniClusterDataDir = new TemporaryFolder();
@@ -79,6 +79,7 @@ public class KafkaProtoParquetWriterTest {
                        miniClusterDataDir.newFolder().getAbsolutePath());
         miniDFSCluster = new MiniDFSCluster.Builder(hdfsConfig).build();
         miniDFSCluster.waitActive();
+        kafkaEmbedded.createTopic(TOPIC, 1);
     }
 
     @AfterClass
@@ -92,7 +93,7 @@ public class KafkaProtoParquetWriterTest {
                 .put(ConsumerConfig.GROUP_ID_CONFIG, RandomStringUtils.randomAlphabetic(6))
                 .put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
                      StringDeserializer.class.getName())
-                .put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaEmbedded.getBrokersAsString())
+                .put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaEmbedded.getBrokerAddress())
                 .put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest")
                 .build();
         targetPath = directory.getPath().toUri().getPath();
@@ -245,7 +246,7 @@ public void testMaxOpenDuration() throws Throwable {
      */
     private ArrayList<SampleMessage> sendSampleMessages(int count) throws Throwable {
         Map<String, Object> conf = ImmutableMap.<String, Object>builder()
-                .put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaEmbedded.getBrokersAsString())
+                .put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaEmbedded.getBrokerAddress())
                 .build();
         ArrayList<SampleMessage> list = new ArrayList<>();
         try (KafkaProducer<Long, byte[]> producer =
