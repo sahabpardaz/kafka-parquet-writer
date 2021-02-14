@@ -95,7 +95,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
     // Maximum size of created parquet files. Zero value means no limitation.
     private final long maxFileSize;
     /**
-     * Maximum time each file is kept open in milliseconds, after this time data of current shard
+     * Maximum time each file is kept open in seconds, after this time data of current shard
      * will be flushed and next file will be created. Zero value means no limitation.
      */
     private final int maxFileOpenDurationSeconds;
