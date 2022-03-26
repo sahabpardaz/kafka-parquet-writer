@@ -105,7 +105,7 @@ public class KafkaProtoParquetWriterTest {
         String parquetFileExtension = ".p";
         ArrayList<SampleMessage> messages;
 
-        Builder<SampleMessage> builder = createCommonBuilder()
+        Builder<SampleMessage> builder = createCommonParquetWriterBuilder()
                 .parquetFileExtension(parquetFileExtension);
 
         try (KafkaProtoParquetWriter<SampleMessage> writer = builder.build()) {
@@ -131,41 +131,43 @@ public class KafkaProtoParquetWriterTest {
     public void testMaxFileSize() throws Throwable {
         final int blockSize = 10 * 1024;
         final int maxFileSize = 10 * blockSize;
-        final int messageCount = 1_000;
         final int numberOfFilesWithMaxFileSize = 2;
 
-        int numberOfMessagesSent = 0;
-
-        Builder<SampleMessage> builder = createCommonBuilder()
+        Builder<SampleMessage> builder = createCommonParquetWriterBuilder()
                 .blockSize(blockSize)
                 .maxFileSize(maxFileSize);
+
+        boolean extraFileExists = false;
 
         try (KafkaProtoParquetWriter<SampleMessage> writer = builder.build()) {
             writer.start();
 
+            // Make sure that Parquet Writer has written the expected files.
+            int numMessages = 1000;
+            int totalMessagesSent = 0;
             while (findFiles(DEFAULT_PARQUET_FILE_EXTENSION).size() < numberOfFilesWithMaxFileSize) {
-                if (writer.getTotalWrittenRecords() != numberOfMessagesSent) {
+                if (writer.getTotalWrittenRecords() != totalMessagesSent) {
                     Thread.sleep(100L);
                 } else {
-                    sendSampleMessages(messageCount);
-                    numberOfMessagesSent += messageCount;
+                    sendSampleMessages(numMessages);
+                    totalMessagesSent += numMessages;
                 }
             }
 
-            // Make sure all records are written.
-            while (writer.getTotalWrittenRecords() != numberOfMessagesSent) {
-                Thread.sleep(100L);
+            // If there are some records remained, wait for them to be written too.
+            if (writer.getTotalWrittenRecords() != totalMessagesSent) {
+                extraFileExists = true;
+                waitForFiles(numberOfFilesWithMaxFileSize + 1, DEFAULT_PARQUET_FILE_EXTENSION);
             }
-
-            // Wait for the last file to be written.
-            waitForFiles(numberOfFilesWithMaxFileSize + 1, DEFAULT_PARQUET_FILE_EXTENSION);
         }
 
         List<LocatedFileStatus> files = findFiles(DEFAULT_PARQUET_FILE_EXTENSION);
 
-        // Delete the incompletely generated file.
-        files.sort(Comparator.comparing(LocatedFileStatus::getModificationTime));
-        files.remove(files.size() - 1);
+        // Remove the extra file, so we can check the other files that should have maximum size.
+        if (extraFileExists) {
+            files.sort(Comparator.comparing(LocatedFileStatus::getModificationTime));
+            files.remove(files.size() - 1);
+        }
 
         for (LocatedFileStatus file : files) {
             assertThat(file.getLen(), greaterThan(0L));
@@ -185,7 +187,7 @@ public class KafkaProtoParquetWriterTest {
         // Creating and starting parquet writer instance
         String directoryDateTimePattern = "yyyy/dd";
 
-        Builder<SampleMessage> builder = createCommonBuilder()
+        Builder<SampleMessage> builder = createCommonParquetWriterBuilder()
                 .directoryDateTimePattern(directoryDateTimePattern);
 
         List<SampleMessage> messages;
@@ -216,9 +218,9 @@ public class KafkaProtoParquetWriterTest {
     }
 
     /**
-     * create a common builder for all unit tests
+     * Creates a builder of Parquet writer instance using common configurations.
      */
-    private Builder<SampleMessage> createCommonBuilder() {
+    private Builder<SampleMessage> createCommonParquetWriterBuilder() {
         return new Builder<SampleMessage>()
                 .hadoopConf(hdfsConfig)
                 .instanceName(INSTANCE_NAME)
@@ -236,7 +238,7 @@ public class KafkaProtoParquetWriterTest {
      */
     private void waitForFiles(int fileCount, String parquetFileExtension) throws InterruptedException, IOException {
         while (findFiles(parquetFileExtension).size() < fileCount) {
-            Thread.sleep(1_000);
+            Thread.sleep(1);
         }
     }
 
