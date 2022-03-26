@@ -380,8 +380,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         @Override
         public void close() throws IOException {
             // Make sure that all offsets are committed.
-            while (!writtenOffsets.isEmpty() ||
-                    smartCommitKafkaConsumer.unappliedAcksSize() != 0) {
+            while (!writtenOffsets.isEmpty() || smartCommitKafkaConsumer.unappliedAcksSize() != 0) {
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {
