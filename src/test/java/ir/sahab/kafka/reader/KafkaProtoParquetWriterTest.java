@@ -35,13 +35,7 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.LongSerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.springframework.kafka.test.rule.EmbeddedKafkaRule;
@@ -98,6 +92,11 @@ public class KafkaProtoParquetWriterTest {
         targetPath = directory.getPath().toUri().getPath();
     }
 
+    @After
+    public void tearDown() {
+        consumeAllRemainingRecords();
+    }
+
     /**
      * Test maxFileOperationDuration configs. It also checks validity of records written to parquet files.
      */
@@ -116,8 +115,6 @@ public class KafkaProtoParquetWriterTest {
             // We should have one file, that is closed base on max open duration.
             waitForFiles(1, parquetFileExtension);
         }
-
-        consumeAllRemainingRecords();
 
         List<LocatedFileStatus> files = findFiles(parquetFileExtension);
         assertEquals(1, files.size());
@@ -150,7 +147,7 @@ public class KafkaProtoParquetWriterTest {
             int totalMessagesSent = 0;
             while (findFiles(DEFAULT_PARQUET_FILE_EXTENSION).size() < numberOfFilesWithMaxFileSize) {
                 if (writer.getTotalWrittenRecords() != totalMessagesSent) {
-                    Thread.sleep(100L);
+                    Thread.sleep(1);
                 } else {
                     sendSampleMessages(numMessages);
                     totalMessagesSent += numMessages;
@@ -163,8 +160,6 @@ public class KafkaProtoParquetWriterTest {
                 waitForFiles(numberOfFilesWithMaxFileSize + 1, DEFAULT_PARQUET_FILE_EXTENSION);
             }
         }
-
-        consumeAllRemainingRecords();
 
         List<LocatedFileStatus> files = findFiles(DEFAULT_PARQUET_FILE_EXTENSION);
 
@@ -204,8 +199,6 @@ public class KafkaProtoParquetWriterTest {
             waitForFiles(1, DEFAULT_PARQUET_FILE_EXTENSION);
         }
 
-        consumeAllRemainingRecords();
-
         // Checking parquet files are created in correct path
         String expectedDir = DateTimeFormatter.ofPattern(directoryDateTimePattern, Locale.getDefault())
                 .withZone(ZoneId.systemDefault())
@@ -225,8 +218,7 @@ public class KafkaProtoParquetWriterTest {
     }
 
     /**
-     * This function commits uncommitted records at the end of the tests.
-     * It should be run at the end of the tests to make sure no record of current test appears in the next test.
+     * Consumes the remaining records of the topic and commits the last offset of partitions.
      */
     private void consumeAllRemainingRecords() {
         Properties properties = new Properties();
@@ -239,10 +231,13 @@ public class KafkaProtoParquetWriterTest {
         try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
             consumer.subscribe(Collections.singleton(TOPIC));
             ConsumerRecords<byte[], byte[]> records;
+
             do {
                 records = consumer.poll(Duration.ofMillis(1_000));
             }
             while (!records.isEmpty());
+
+            consumer.commitSync();
         }
     }
 
