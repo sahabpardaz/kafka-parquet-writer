@@ -1,6 +1,7 @@
 package ir.sahab.kafka.reader;
 
 import static org.apache.kafka.clients.consumer.ConsumerConfig.*;
+import static org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS_CONFIG;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.lessThan;
@@ -14,24 +15,23 @@ import ir.sahab.kafka.parquet.TemporaryHdfsDirectory;
 import ir.sahab.kafka.reader.KafkaProtoParquetWriter.Builder;
 import ir.sahab.kafka.test.proto.TestMessage.SampleMessage;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.LongSerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -52,6 +52,7 @@ public class KafkaProtoParquetWriterTest {
     private static final String INSTANCE_NAME = "TestParquetWriter";
     private static final String DEFAULT_PARQUET_FILE_EXTENSION = ".parquet";
     private static final String CONSUMER_GROUP_ID = "CONSUMER_GROUP_ID";
+    private static final String OFFSET_RESET_STRATEGY = OffsetResetStrategy.EARLIEST.name().toLowerCase();
     private static final HdfsConfiguration hdfsConfig = new HdfsConfiguration();
     private static final int OFFSET_TRACKER_PAGE_SIZE = 1;
     private static final int DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS = 2;
@@ -91,7 +92,7 @@ public class KafkaProtoParquetWriterTest {
                 .put(GROUP_ID_CONFIG, CONSUMER_GROUP_ID)
                 .put(KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName())
                 .put(BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaRule.getEmbeddedKafka().getBrokersAsString())
-                .put(AUTO_OFFSET_RESET_CONFIG, OffsetResetStrategy.EARLIEST.name().toLowerCase())
+                .put(AUTO_OFFSET_RESET_CONFIG, OFFSET_RESET_STRATEGY)
                 .build();
 
         targetPath = directory.getPath().toUri().getPath();
@@ -115,6 +116,8 @@ public class KafkaProtoParquetWriterTest {
             // We should have one file, that is closed base on max open duration.
             waitForFiles(1, parquetFileExtension);
         }
+
+        consumeAllRemainingRecords();
 
         List<LocatedFileStatus> files = findFiles(parquetFileExtension);
         assertEquals(1, files.size());
@@ -161,6 +164,8 @@ public class KafkaProtoParquetWriterTest {
             }
         }
 
+        consumeAllRemainingRecords();
+
         List<LocatedFileStatus> files = findFiles(DEFAULT_PARQUET_FILE_EXTENSION);
 
         // Remove the extra file, so we can check the other files that should have maximum size.
@@ -199,6 +204,8 @@ public class KafkaProtoParquetWriterTest {
             waitForFiles(1, DEFAULT_PARQUET_FILE_EXTENSION);
         }
 
+        consumeAllRemainingRecords();
+
         // Checking parquet files are created in correct path
         String expectedDir = DateTimeFormatter.ofPattern(directoryDateTimePattern, Locale.getDefault())
                 .withZone(ZoneId.systemDefault())
@@ -215,6 +222,28 @@ public class KafkaProtoParquetWriterTest {
         List<SampleMessage> actual = ParquetTestUtils.readParquetFiles(hdfsConfig, files, SampleMessage.class);
         assertEquals(messages.size(), actual.size());
         assertThat(actual, containsInAnyOrder(messages.toArray(new SampleMessage[0])));
+    }
+
+    /**
+     * This function commits uncommitted records at the end of the tests.
+     * It should be run at the end of the tests to make sure no record of current test appears in the next test.
+     */
+    private void consumeAllRemainingRecords() {
+        Properties properties = new Properties();
+        properties.put(GROUP_ID_CONFIG, CONSUMER_GROUP_ID);
+        properties.put(BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaRule.getEmbeddedKafka().getBrokersAsString());
+        properties.put(AUTO_OFFSET_RESET_CONFIG, OFFSET_RESET_STRATEGY);
+        properties.put(KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+        properties.put(VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+
+        try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
+            consumer.subscribe(Collections.singleton(TOPIC));
+            ConsumerRecords<byte[], byte[]> records;
+            do {
+                records = consumer.poll(Duration.ofMillis(1_000));
+            }
+            while (!records.isEmpty());
+        }
     }
 
     /**
