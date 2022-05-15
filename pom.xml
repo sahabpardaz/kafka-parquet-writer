@@ -29,22 +29,21 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>11.0.2</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.7</version>
+            <version>3.12.0</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.parquet</groupId>
             <artifactId>parquet-protobuf</artifactId>
             <version>1.12.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.sahabpardaz</groupId>
+            <artifactId>smart-commit-kafka-consumer</artifactId>
+            <version>1.5.1-kafka2.7.2</version>
         </dependency>
 
         <dependency>
@@ -71,7 +70,7 @@
         <dependency>
             <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-core</artifactId>
-            <version>3.2.5</version>
+            <version>4.1.26</version>
         </dependency>
 
         <dependency>
@@ -102,15 +101,15 @@
         </dependency>
 
         <dependency>
-            <groupId>com.github.sahabpardaz</groupId>
-            <artifactId>smart-commit-kafka-consumer</artifactId>
-            <version>1.5.1-kafka2.7.2</version>
-        </dependency>
-
-        <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka-test</artifactId>
             <version>2.7.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>11.0.2</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

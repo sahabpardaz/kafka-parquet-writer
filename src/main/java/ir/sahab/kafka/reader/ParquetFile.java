@@ -23,11 +23,11 @@ import org.slf4j.LoggerFactory;
  */
 public class ParquetFile<T extends Message> implements AutoCloseable {
 
-    private static Logger logger = LoggerFactory.getLogger(ParquetFile.class);
+    private static final Logger logger = LoggerFactory.getLogger(ParquetFile.class);
 
     private final Path filePath;
     private final Class<T> protoClass;
-    private ParquetWriter<T> writer;
+    private final ParquetWriter<T> writer;
 
     private final Date creationDate;
 
@@ -41,7 +41,7 @@ public class ParquetFile<T extends Message> implements AutoCloseable {
 
         ParquetWriterBuilder builder =
                 new ParquetWriterBuilder(filePath).withConf(properties.hadoopConf)
-                        .withRowGroupSize((long) properties.blockSize)
+                        .withRowGroupSize(properties.blockSize)
                         .withCompressionCodec(properties.compressionCodecName)
                         .withWriteMode(Mode.OVERWRITE)
                         .withPageSize(properties.pageSize);
@@ -106,12 +106,12 @@ public class ParquetFile<T extends Message> implements AutoCloseable {
 
         private final Configuration hadoopConf;
 
-        private final int blockSize;
+        private final long blockSize;
         private final CompressionCodecName compressionCodecName;
         private final int pageSize;
         private final boolean enableDictionary;
 
-        public ParquetProperties(Configuration hadoopConf, int blockSize,
+        public ParquetProperties(Configuration hadoopConf, long blockSize,
                 CompressionCodecName compressionCodecName, int pageSize, boolean enableDictionary) {
             this.hadoopConf = hadoopConf;
             this.blockSize = blockSize;

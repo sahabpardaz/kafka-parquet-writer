@@ -165,10 +165,8 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
 
     /**
      * Starts to poll from Kafka topic and writes the records in parquet files from several concurrent worker threads.
-     *
-     * @throws IOException if connecting  to Kafka fails
      */
-    public void start() throws IOException, InterruptedException {
+    public void start() {
         logger.info("Starting Kafka parquet writer '{}' for {} topic...", instanceName, topic);
         smartCommitKafkaConsumer.start();
         workerThreads = new ArrayList<>();
@@ -230,7 +228,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         // Lock used to synchronize interrupting thread and closing underlying parquet writer.
         private final Object closeLock = new Object();
 
-        private ArrayList<PartitionOffset> writtenOffsets = new ArrayList<>();
+        private final ArrayList<PartitionOffset> writtenOffsets = new ArrayList<>();
 
         WorkerThread(int index) {
             this.index = index;
@@ -284,6 +282,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
                         finalizeCurrentFile();
                     }
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     if (running) {
                         throw new IllegalStateException("Unexpected exception occurred.", e);
                     }
@@ -340,7 +339,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
                 fileSizeHistogram.update(dataSize);
             }
             currentFile = null;
-            Path finalFilePath = renameAndMoveTempFile();
+            renameAndMoveTempFile();
 
             // Inform Kafka consumer about the records that are written. So it detects the offsets which can be
             // committed on each partition.
@@ -356,7 +355,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
          *
          * @return path of final parquet file
          */
-        private Path renameAndMoveTempFile() throws InterruptedException {
+        private void renameAndMoveTempFile() throws InterruptedException {
             Path destDir;
             FileSystem fileSystem = tryUntilSucceeds(() -> FileSystem.get(hadoopConf));
             // Creating directory based on provided directory datetime pattern if it does not exist
@@ -374,11 +373,10 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
                 return dst;
             });
             logger.debug("Parquet file '{}' finalized to '{}'", temporaryFilePath, finalFilePath);
-            return finalFilePath;
         }
 
         @Override
-        public void close() throws IOException {
+        public void close() {
             logger.info("Closing parquet writer worker thread: {}.", index);
             running = false;
             if (thread != null) {
@@ -390,6 +388,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
                 try {
                     thread.join();
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     throw new IllegalStateException(
                             "Unexpected interrupt while joining thread.", e);
                 }
@@ -459,7 +458,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
 
         // Configs indicating when should close a parquet file
         private int maxFileOpenDurationSeconds = 15 * 60; // Default: 15 Minutes
-        private long maxFileSize = 1024 * 1024 * 1024; // Default: 1GB
+        private long maxFileSize = 1024L * 1024 * 1024; // Default: 1GB
         private int maxExpectedThroughputPerSecond = 300_000;
 
         // Configs about the underlying smart Kafka consumer
@@ -470,7 +469,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
         private String topic;
 
         // Configs related to parquet blocks
-        private int blockSize = ParquetWriter.DEFAULT_BLOCK_SIZE;
+        private long blockSize = ParquetWriter.DEFAULT_BLOCK_SIZE;
         private int pageSize = ParquetWriter.DEFAULT_BLOCK_SIZE;
 
         // Configs related to hdfs
@@ -643,7 +642,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
          * @param blockSize HDFS block size of parquet files
          * If it is not set, its default value will be used.
          */
-        public Builder<T> blockSize(int blockSize) {
+        public Builder<T> blockSize(long blockSize) {
             Validate.isTrue(blockSize > 0, "Block size must be a positive number.");
             this.blockSize = blockSize;
             return this;
