@@ -41,7 +41,7 @@ public class ParquetFile<T extends Message> implements AutoCloseable {
 
         ParquetWriterBuilder builder =
                 new ParquetWriterBuilder(filePath).withConf(properties.hadoopConf)
-                        .withRowGroupSize(properties.blockSize)
+                        .withRowGroupSize((long) properties.blockSize)
                         .withCompressionCodec(properties.compressionCodecName)
                         .withWriteMode(Mode.OVERWRITE)
                         .withPageSize(properties.pageSize);
