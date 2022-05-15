@@ -1,6 +1,6 @@
 package ir.sahab.kafka.parquet;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -24,8 +24,7 @@ public class ParquetTestUtils {
      * @param protoClass class of protocol buffer message to read
      * @return a list of read messages
      */
-    @SuppressWarnings("rawtypes")
-    public static <T extends GeneratedMessage> List<T> readParquetFiles(Configuration hdfsConfig,
+    public static <T extends Message> List<T> readParquetFiles(Configuration hdfsConfig,
             Collection<LocatedFileStatus> parquetFiles, Class<T> protoClass) throws IOException {
         ProtoReadSupport.setProtobufClass(hdfsConfig, protoClass.getName());
         List<T> logs = new ArrayList<>();
