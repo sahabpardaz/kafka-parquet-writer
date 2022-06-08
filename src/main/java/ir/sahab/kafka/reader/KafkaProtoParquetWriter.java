@@ -115,6 +115,8 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
     private final Meter totalWrittenBytes = new Meter();
     // Total size of flushed data (bytes) in parquet files
     private final Meter totalFlushedBytes = new Meter();
+    // Total closed (finalized) parquet files
+    private final Meter totalClosedFiles = new Meter();
     // Histogram on size of closed files
     private Histogram fileSizeHistogram;
 
@@ -147,6 +149,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
             metricRegistry.register("parquet.writer.flushed.records", totalFlushedRecords);
             metricRegistry.register("parquet.writer.written.bytes", totalWrittenBytes);
             metricRegistry.register("parquet.writer.flushed.bytes", totalFlushedBytes);
+            metricRegistry.register("parquet.writer.closed.files", totalClosedFiles);
             fileSizeHistogram = metricRegistry.histogram("parquet.writer.file.size");
         }
 
@@ -335,6 +338,7 @@ public class KafkaProtoParquetWriter<T extends Message> implements Closeable {
             });
             totalFlushedRecords.mark(currentFile.getNumWrittenRecords());
             totalFlushedBytes.mark(dataSize);
+            totalClosedFiles.mark();
             if(fileSizeHistogram != null) {
                 fileSizeHistogram.update(dataSize);
             }
