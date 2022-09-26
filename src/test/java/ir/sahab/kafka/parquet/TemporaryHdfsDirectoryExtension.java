@@ -6,17 +6,19 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.junit.rules.ExternalResource;
+import org.junit.jupiter.api.extension.AfterEachCallback;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TemporaryHdfsDirectory rule creates a temporary directory on HDFS and automatically deletes it
+ * TemporaryHdfsDirectory extension creates a temporary directory on HDFS and automatically deletes it
  * after test completion.
  */
-public class TemporaryHdfsDirectory extends ExternalResource {
+public class TemporaryHdfsDirectoryExtension implements BeforeEachCallback, AfterEachCallback {
 
-    private static Logger logger = LoggerFactory.getLogger(TemporaryHdfsDirectory.class);
+    private static Logger logger = LoggerFactory.getLogger(TemporaryHdfsDirectoryExtension.class);
 
     /**
      * Number of random numbers used in name of created temporary directory.
@@ -28,20 +30,20 @@ public class TemporaryHdfsDirectory extends ExternalResource {
     private Path path;
 
     /**
-     * Creates a rule which creates a temporary directory inside /tmp directory of HDFS
+     * Creates a extension which creates a temporary directory inside /tmp directory of HDFS
      * @param config configuration used to connect to HDFS
      */
-    public TemporaryHdfsDirectory(Configuration config) {
+    public TemporaryHdfsDirectoryExtension(Configuration config) {
         this(config,
                 new Path(config.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + "/tmp"));
     }
 
     /**
-     * Creates a rule which creates a temporary directory on given path.
+     * Creates a extension which creates a temporary directory on given path.
      * @param config configuration used to connect to HDFS
      * @param parentPath path to create temporary directory in
      */
-    public TemporaryHdfsDirectory(Configuration config, Path parentPath) {
+    public TemporaryHdfsDirectoryExtension(Configuration config, Path parentPath) {
         this.config = config;
         this.parentPath = parentPath;
     }
@@ -50,7 +52,7 @@ public class TemporaryHdfsDirectory extends ExternalResource {
      * Creates a random directory in {@link #parentPath}.
      */
     @Override
-    protected void before() throws Throwable {
+    public void beforeEach(ExtensionContext arg0) throws Exception {
         FileSystem fs = FileSystem.get(config);
         do {
             path = new Path(parentPath,
@@ -65,7 +67,7 @@ public class TemporaryHdfsDirectory extends ExternalResource {
      * Deletes created temporary directory.
      */
     @Override
-    protected void after() {
+    public void afterEach(ExtensionContext arg0) throws Exception {
         try {
             FileSystem.get(config).delete(path, true);
             logger.debug("Temporary directory {} deleted.", path);
