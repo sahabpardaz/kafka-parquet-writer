@@ -5,22 +5,30 @@ import static org.apache.kafka.clients.producer.ProducerConfig.BOOTSTRAP_SERVERS
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.lessThan;
-import static  org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import com.google.common.collect.ImmutableMap;
 import ir.sahab.kafka.parquet.HdfsTestUtil;
 import ir.sahab.kafka.parquet.ParquetTestUtils;
-import ir.sahab.kafka.parquet.TemporaryHdfsDirectory;
+import ir.sahab.kafka.parquet.TemporaryHdfsDirectoryExtension;
 import ir.sahab.kafka.reader.KafkaProtoParquetWriter.Builder;
 import ir.sahab.kafka.test.proto.TestMessage.SampleMessage;
+import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
@@ -35,12 +43,20 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.LongSerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.junit.*;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
-import org.springframework.kafka.test.rule.EmbeddedKafkaRule;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.kafka.test.EmbeddedKafkaBroker;
+import org.springframework.kafka.test.context.EmbeddedKafka;
 
-public class KafkaProtoParquetWriterTest {
+@EmbeddedKafka(count = 1, controlledShutdown = true, topics = "proto-source")
+@Timeout(15)
+class KafkaProtoParquetWriterTest {
 
     private static final String TOPIC = "proto-source";
     private static final String INSTANCE_NAME = "TestParquetWriter";
@@ -52,48 +68,41 @@ public class KafkaProtoParquetWriterTest {
     private static final int DEFAULT_MAX_FILE_OPEN_DURATION_SECONDS = 2;
 
     private static MiniDFSCluster miniDFSCluster;
+    private static EmbeddedKafkaBroker embeddedKafka;
 
     private ImmutableMap<String, Object> consumerConfig;
     private String targetPath;
 
-    @ClassRule
-    public static EmbeddedKafkaRule embeddedKafkaRule = new EmbeddedKafkaRule(1, true, TOPIC);
+    @RegisterExtension
+    TemporaryHdfsDirectoryExtension directory = new TemporaryHdfsDirectoryExtension(hdfsConfig);
 
-    @ClassRule
-    public static TemporaryFolder miniClusterDataDir = new TemporaryFolder();
-
-    @Rule
-    public TemporaryHdfsDirectory directory = new TemporaryHdfsDirectory(hdfsConfig);
-
-    @Rule
-    public Timeout timeout = new Timeout(15, TimeUnit.SECONDS);
-
-    @BeforeClass
-    public static void setUpClass() throws Exception {
-        hdfsConfig.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, miniClusterDataDir.newFolder().getAbsolutePath());
+    @BeforeAll
+    static void setUpClass(EmbeddedKafkaBroker embeddedKafkaBroker, @TempDir File miniClusterDataDir) throws Exception {
+        KafkaProtoParquetWriterTest.embeddedKafka = embeddedKafkaBroker;
+        hdfsConfig.set(MiniDFSCluster.HDFS_MINIDFS_BASEDIR, miniClusterDataDir.getAbsolutePath());
         miniDFSCluster = new MiniDFSCluster.Builder(hdfsConfig).build();
         miniDFSCluster.waitActive();
     }
 
-    @AfterClass
-    public static void tearDownClass() {
+    @AfterAll
+    static void tearDownClass() {
         miniDFSCluster.shutdown();
     }
 
-    @Before
-    public void setUp() {
+    @BeforeEach
+    void setUp() {
         consumerConfig = ImmutableMap.<String, Object>builder()
                 .put(GROUP_ID_CONFIG, CONSUMER_GROUP_ID)
                 .put(KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName())
-                .put(BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaRule.getEmbeddedKafka().getBrokersAsString())
+                .put(BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString())
                 .put(AUTO_OFFSET_RESET_CONFIG, OFFSET_RESET_STRATEGY)
                 .build();
 
         targetPath = directory.getPath().toUri().getPath();
     }
 
-    @After
-    public void tearDown() {
+    @AfterEach
+    void tearDown() {
         consumeAllRemainingRecords();
     }
 
@@ -101,7 +110,7 @@ public class KafkaProtoParquetWriterTest {
      * Test maxFileOperationDuration configs. It also checks validity of records written to parquet files.
      */
     @Test
-    public void testMaxOpenDuration() throws Throwable {
+    void testMaxOpenDuration() throws Throwable {
         String parquetFileExtension = ".p";
         ArrayList<SampleMessage> messages;
 
@@ -128,7 +137,7 @@ public class KafkaProtoParquetWriterTest {
     }
 
     @Test
-    public void testMaxFileSize() throws Throwable {
+    void testMaxFileSize() throws Throwable {
         final int blockSize = 10 * 1024;
         final int maxFileSize = 10 * blockSize;
         final int numberOfFilesWithMaxFileSize = 2;
@@ -183,7 +192,7 @@ public class KafkaProtoParquetWriterTest {
      * {@link Builder#directoryDateTimePattern(String)} config.
      */
     @Test
-    public void testDirectoryDateTimePattern() throws Throwable {
+    void testDirectoryDateTimePattern() throws Throwable {
         // Creating and starting parquet writer instance
         String directoryDateTimePattern = "yyyy/dd";
 
@@ -223,7 +232,7 @@ public class KafkaProtoParquetWriterTest {
     private void consumeAllRemainingRecords() {
         Properties properties = new Properties();
         properties.put(GROUP_ID_CONFIG, CONSUMER_GROUP_ID);
-        properties.put(BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaRule.getEmbeddedKafka().getBrokersAsString());
+        properties.put(BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString());
         properties.put(AUTO_OFFSET_RESET_CONFIG, OFFSET_RESET_STRATEGY);
         properties.put(KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
         properties.put(VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
@@ -283,7 +292,7 @@ public class KafkaProtoParquetWriterTest {
      */
     private ArrayList<SampleMessage> sendSampleMessages(int count) {
         Map<String, Object> conf = ImmutableMap.<String, Object>builder()
-                .put(BOOTSTRAP_SERVERS_CONFIG, embeddedKafkaRule.getEmbeddedKafka().getBrokersAsString())
+                .put(BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString())
                 .build();
 
         ArrayList<SampleMessage> sampleMessages = new ArrayList<>();
@@ -299,7 +308,7 @@ public class KafkaProtoParquetWriterTest {
                         .setResultPerPage(random.nextInt())
                         .build();
                 ProducerRecord<Long, byte[]> record = new ProducerRecord<>(TOPIC, (long) i, message.toByteArray());
-                producer.send(record, (metadata, exception) -> Assert.assertNull(exception));
+                producer.send(record, (metadata, exception) -> assertNull(exception));
                 sampleMessages.add(message);
             }
         }
